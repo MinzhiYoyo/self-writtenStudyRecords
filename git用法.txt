@@ -1,0 +1,16 @@
+框架：
+	本地文件 ---> 暂存区 ---> 本地仓库
+命令：
+	git init     初始化git
+	git remote add <originName> -m <branchName> <url>    从url的branchName上创建一个名为originName的远程主机
+	git pull <originName> <branchName>                 复制远程仓库中的branchName分支到本地
+	git add <fileName>  从本地问价中添加名为fileName的文件到暂存区
+	git commit -m “英文注释”      将暂存区的文件添加上英文注释到本地仓库
+	git push <originName> <branchName1>:<branchName2>            从originName主机将本地branchName1分支复制到远程branchName2分支
+	
+	git status             查看当前暂存区状态
+	git remote -v     	查看当前主机状态
+版本控制：
+	git log 查看版本信息
+	git reset --hard HEAD^ 回退到上一个版本
+	git reset hard 版本号   回退到版本号这个版本

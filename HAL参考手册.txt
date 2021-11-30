@@ -1,0 +1,365 @@
+
+
+下载方式：DTR高电平复位，RTS高电平进BootLoader（正点原子开发板）
+
+GPIO相关的库函数及数据
+	1、GPIO电平输出的HAL库函数：
+		void 				HAL_GPIO_WritePIn(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin, Gpio_PinState PinState);
+			GPIOx :目标引脚的端口号
+			GPIO_Pin :目标引脚的引脚浩
+			PinState :	高电平--GPIO_PIN_SET--1; 低电平--GPIO_PIN_RESET--0
+
+	2、GPIO电平翻转HAL库函数
+		void 				HAL_GPIO_TogglePin( GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin );
+
+	3、结构体 GPIO_InitTypeDef
+		typedef struct{
+			uint32_t Pin;
+			uint32_t Mode;		//GPIO_MODE_OUTPUT_PP---推挽输出
+			uint32_t Pull;		//GPIO_NOPULL---没有上拉
+			uint32_t Speed;
+			uint32_t Alternate;
+		}GPIO_InitTypeDef;
+
+	4、枚举 GPIO_PinState
+		typedef enum{
+			GPIO_PIN_RESET = 0 ,
+			GPIO_PIN_SET
+		}GPIO_PinState
+
+	5、电平输入函数
+		GPIO_PinState 		HAL_GPIO_ReadPin(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin);
+		
+	6、HAL_StatusTypeDef 	HAL_GPIO_LockPin(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin);
+	7、void 				HAL_GPIO_EXTI_IRQHandler(uint16_t GPIO_Pin);
+	8、void 				HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin);
+
+	9、使能外设时钟
+		__HAL_RCC_GPIOA_CLK_ENABLE();
+		__HAL_RCC_GPIOB_CLK_ENABLE();
+		__HAL_RCC_GPIOC_CLK_ENABLE();
+		
+	10、定时时间到的回调函数
+		HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+
+	11、sprintf(char *p , const char *str , ……)函数
+		包含于"stdio.h"
+		可以将后面的字符串格式赋值给前面的字符串
+		如果想用串口发送中文，需要用到ANSI编码
+			①将Keil5中的Edit中Configuration改成ANSI
+			②将对应文件用记事本打开另存为ANSI编码
+			③将Vscode中的编码改成GB2312
+		
+		
+		
+
+外部中断相关
+	1、手写代码的思路
+		--将GPIO初始化为输入端口
+		--配置相关I/O引脚与中断线的映射关系
+		--设置该I/O引脚对应的中断触发条件
+		--配置NVIC，并使能中断
+		--编写终端服务函数
+	2、基于stm32cubemx的思路
+		--在stm32Cubemx中指定一脚，配置中断初始化参数
+		--重写该I/O引脚对应的中断回调函数，“_week”开头的虚函数
+		--中断服务回调函数
+			stm32f1xx_it.c --> EXTIx_IRQHandler() --> HAL_GPIO_EXTI_IRQHandler() --> HAL_GPIO_EXTI_Callback()
+	3、注意事项
+		--用来实现按键外部中断想去己写一个循环延时函数
+										void delay(unsigned int i){	while(i--);	}
+										delay(5000);抖动，请自
+			并且，写在中断进入函数，stm32f1xx_it.c里面的
+
+HAL串口如果想使用printf和scanf,阻塞式的收发
+		#include "stdio.h"
+		int fputc(int ch, FILE *f){
+		 HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1 , 100);
+		 return ch;
+		}	//为printf服务
+		int fgetc(FILE *f){
+		 uint8_t ch = 0 ;
+		 HAL_UART_Receive(&huart1, &ch , 1, 100);
+		 return ch ;
+		}	//为scanf服务
+	//将上面这段代码加入uart.c里面就行
+	
+HAL库中串口发送的函数(带IT的表示是需要写中断回调函数的)
+	1、阻塞式发送函数（推荐）
+		HAL_StatusTypeDef HAL_UART_Transmit(
+			UART_HandleTypeDef *huart,
+			uint8_t *pData,
+			uint16_t Size,
+			uint32_t Timeout
+		);
+		
+	2、非阻塞式发送函数
+		HAL_StatusTypeDef HAL_UART_Transmit_IT(
+			UART_HandleTypeDef *huart,
+			uint8_t *pData,
+			uint16_t Size
+		);
+	
+	3、发送完毕中断回调函数
+		void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart);
+
+	4、发送一半调用中断回调函数
+		void HAL_UART_TxHalfCpltCallback(UART_HandleTypeDef *huart);
+
+HAL库中串口接收的函数(带IT的表示是需要写中断回调函数的)	
+	1、阻塞式接收函数
+		HAL_StatusTypeDef HAL_UART_Receive(
+			UART_HandleTypeDef *huart,
+			uint8_t *pData,
+			uint16_t Size,
+			uint32_t Timeout
+		);	
+
+	2、非阻塞式接收函数（推荐）
+		HAL_StatusTypeDef HAL_UART_Receive_IT(
+			UART_HandleTypeDef *huart,
+			uint8_t *pData, 
+			uint16_t Size
+		);
+
+	3、接收完毕中断回调函数
+		void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart);
+
+	4、接收一半调用中断回调函数
+		void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart);
+
+
+A<=>D转化相关操作
+	1、阻塞式查询方式
+		uint16_t ADC_Value = 0 ;
+		HAL_ADC_Start(&hadc);
+		if( HAL_OK == HAL_ADC_PollForConversio(&hadc, 10)){
+			ADC_Value = HAL_ADC_GetValue(&hadc);
+		}
+	
+	2、中断方式，非阻塞式的A/D转化相关操作
+		uint16_t ADC_Value = 0 ;
+		HAL_ADC_Start_IT(&hadc);
+		void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc1){
+			ADC_Value = HAL_ADC_GetValue(&hadc);
+		} 
+	3、dac
+		HAL_DAC_SetValue();
+
+4、自己的代码
+			HAL_ADC_Start(&hadc1);
+			if( HAL_ADC_PollForConversion(&hadc1, 100) == HAL_OK ){
+       			ADC_Value = HAL_ADC_GetValue(&hadc1);//*f+ADC_Value*(1-f);  //采样值
+      			ADC_Volt = ADC_Value * 3254 / 4096 ;    //电压值
+   			}
+  			HAL_ADC_Stop(&hadc1);
+			printf("采样值:%d,电压值:%d.%d%dV\r\n",ADC_Value, ADC_Volt/1000, (ADC_Volt%1000/100), ADC_Volt%100);
+
+			void MF_DAC_CH1_SetV(double v){
+				uint32_t t;
+				if(v<0){
+					HAL_DAC_SetValue(&hdac,DAC_CHANNEL_1,DAC_ALIGN_12B_R,0);
+					return ;
+				}
+				if(v>3.254){
+					HAL_DAC_SetValue(&hdac,DAC_CHANNEL_1,DAC_ALIGN_12B_R,4040);
+					return ;
+				}
+				t = (uint32_t)(v/3.254*4040+5);
+						HAL_DAC_SetValue(&hdac,DAC_CHANNEL_1,DAC_ALIGN_12B_R,t);
+			}
+
+
+OLED显示，有SPI和IIC
+	1、如果是用来显示char *应该强制转化为uint8_t *
+	2、也可以通过改变fputc、fgetc
+
+
+	
+
+SPI相关
+	1、stm32cubemx配置：全双工主机模式
+	2、DMA查询
+	3、相关函数：(阻塞方式)
+		HAL_SPI_Transmit();
+		HAL_SPI_Receive();
+		HAL_SPI_TransmitReceive();
+	4、相关函数：（中断方式）
+		HAL_SPI_Transmit_IT();
+		HAL_SPI_Receive_IT();
+		HAL_SPI_TransmitReceive_IT();
+	5、相关函数：（DMA模式）
+		HAL_SPI_Transmit_DMA();
+		HAL_SPI_Receive_DMA();
+		HAL_SPI_TransmitReceive_DMA();
+
+Prescaler --> 预分频系数
+Period    --> 
+PWM实验+呼吸灯：
+	1、https://www.cnblogs.com/xingboy/p/9910771.html 生成可调频率占空比的PWM波
+
+	2、重点在于改tim.c里面的初始化函数，增加形参 uint16_t pre,uint16_t pul
+			然后改成 htim4.Init.Prescaler =pre;   sConfigOC.Pulse = pul;
+
+	3、	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1); //PWM开启函数
+		MX_TIM4_Init(uint16_t pre,uint16_t pul)； //改变参数就可实现改变占空比跟频率的目的了
+		HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_1);//停止PWM
+
+	4、	占空比 = （Pulse/Period）*100%；
+		频率: f = 48M/Prescaler/Period；
+		举个例子说明一下：
+			这里Period设为100，如果我要设定一个频率为1500Hz、占空比5%的PWM波，只需要
+				传入参数		Pulse=5（占空比 = Pulse / Period * 100% =（5/100） * 100%=5%）
+								Prescaler=320（f = 系统频率 / 分频 / 计数周期 = 48M/320/100 = 1500Hz）
+								Frequency = 系统频率 / Prescaler / Period ;
+								周期 T = Prescaler * Period / 系统频率 ;
+		48M是指stm32cubemx中时钟树最后一列的数值
+
+	5、呼吸灯：BV1gs411M7GM  哔哩哔哩视频
+	6、PWM引脚设置为输出，LED设置为输入
+	7、通过设置 TIMx->CCRy 来改变占空比 x：定时器x；y：通道y。
+	8、电压高于CCRy则输出1，否则是0
+
+定时器：
+	1、定时时间 = (Prescaler+1)*(Count Period+1)*1/定时器时钟频率
+	2、定时器溢出回调函数
+		__week void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+		重写回调函数
+			void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
+				if(htim->Instance == TIMx){ //x表示那个定时器，具体就具体来写
+					//代码块
+				}
+			}
+	3、定时器开始，用中断的：HAL_TIM_Base_Start_IT(TIM_HandleTypeDef *htim);
+	4、定时器停止，用中断的：HAL_TIM_Base_Stop_IT(TIM_HandleTypeDef *htim);
+
+延时微秒：	
+	方式1：	void delay_us(uint32_t us){
+    			uint32_t delay = (HAL_RCC_GetHCLKFreq() / 4000000 * us);
+    			while (delay--)
+				{
+					;
+				}
+			}
+
+	方式2：
+	#define CPU_FREQUENCY_MHZ    72		// STM32时钟主频
+	void delay_us(__IO uint32_t delay){
+	    int last, curr, val;
+	    int temp;
+	    while (delay != 0)
+	    {
+	        temp = delay > 900 ? 900 : delay;
+	        last = SysTick->VAL;
+	        curr = last - CPU_FREQUENCY_MHZ * temp;
+	        if (curr >= 0)
+	        {
+	            do
+	            {
+	                val = SysTick->VAL;
+	            }
+	            while ((val < last) && (val >= curr));
+	        }
+	        else
+	        {
+	            curr += CPU_FREQUENCY_MHZ * 1000;
+	            do
+	            {
+	                val = SysTick->VAL;
+	            }
+	            while ((val <= last) || (val > curr));
+	        }
+	        delay -= temp;
+	    }
+	}
+		
+关于keil生成lib文件并调用外部lib文件方法
+	1、生成lib文件
+		---新建工程，F1或者F4芯片都可以通用
+		---新建.c和.h文件
+		---点击output，不生成hex文件，点击生成lib文件，全称是libra……
+		---得到一个.h和.lib文件
+	2、调用外部lib文件
+		---包含头文件
+		---像添加.c和.h文件一样添加.lib文件进某个组，并将.h文件路径包含到C/C++的includepath
+		---就可以直接使用.h文件里面的函数啦啦啦啦！！！！！！！！
+		
+		
+关于stm32f429使用DSP库的方法：https://blog.csdn.net/qq_40965124/article/details/107464429
+	_FPU_PRESENT 路径：system_stm32f4xx.c ----> stm32f4xx.h ---->stm32f429xx.h(这个根据是哪种单片机来找)
+	应该将stm32f429xx.h中的#define _FPU_PRESENT 1U 注释掉
+
+	然后Option for Target → C/C++ → Define中添加__FPU_PRESENT=1,__TARGET_FPU_VFP,ARM_MATH_CM4,__CC_ARM
+	h7的板子：STMH32H743xx,USE_HAL_DRIVER,__FPU_PRESENT,ARM_MATH_CM7,__CC_ARM,ARM_MATH_MATRIX_CHECK,ARM_MATH_ROUNDING
+		c++包含路径：
+			drives/cmsis/dsp/include
+			drives/cmsis/include
+		lib：
+			arm_cortexM7lfdp_math.lib
+	参考链接：https://blog.csdn.net/zsyzww/article/details/104656203
+	
+	#include "arm_math.h" //包含的头文件
+	#define FFT_LENGTH 1024 		//FFT进行1024个点采样的FFT
+	float fft_inputbuf[FFT_LENGTH*2];	//FFT输入数组，偶数下标为电压值，实部；奇数下标为0，虚部；
+	float fft_outputbuf[FFT_LENGTH];	//FFT输出数组
+
+	int main(){
+		arm_cfft_radix4_instance_f32 scfft;
+		arm_cfft_radix4_init_f32(&scfft,FFT_LENGTH,0,1);//初始化scfft结构体，设定FFT相关参数
+		for(i=0;i<FFT_LENGTH;i++)//随机生成fft信号序列
+			{
+				 fft_inputbuf[2*i]=100+
+				                   10*arm_sin_f32(2*PI*i/FFT_LENGTH)+
+								   30*arm_sin_f32(2*PI*i*4/FFT_LENGTH)+
+				                   50*arm_cos_f32(2*PI*i*8/FFT_LENGTH);	//实部为电压值，偶数下标
+				 fft_inputbuf[2*i+1]=0;//虚部为0，奇数下标
+			}
+			arm_cfft_radix4_f32(&scfft,fft_inputbuf);	//FFT计算（基于4）
+			arm_cmplx_mag_f32(fft_inputbuf,fft_outputbuf,FFT_LENGTH);	//把运算结果求得模值 
+	 }
+			
+	函数：
+		arm_status arm_cfft_radix4_init_f32( arm_cfft_radix4_instance_f32 * S,
+																uint16_t fftLen,
+																uint8_t ifftFlag,
+																uint8_t bitReverseFlag);
+
+		void arm_cfft_radix4_f32(const arm_cfft_radix4_instance_f32 * S, float32_t * pSrc);
+
+		void arm_cmplx_mag_f32(float32_t * pSrc, float32_t * pDst, uint32_t numSamples);
+
+		第一个函数 arm_cfft_radix4_init_f32( arm_cfft_radix4_instance_f32 * S,
+																uint16_t fftLen,
+																uint8_t ifftFlag,
+																uint8_t bitReverseFlag);
+				用于初始化 FFT 运算相关参数，
+				其中：	fftLen 用于指定 FFT 长度（16/64/256/1024/4096），本章设置为 1024；
+						ifftFlag 用于指定是傅里叶变换(0)还是反傅里叶变换(1)，本章设置为 0；
+						bitReverseFlag 用于设置是否按位取反，本章设置为 1；
+				最后， 所有这些参数存储在一个 arm_cfft_radix4_instance_f32 结构体指针 S 里面。
+		第二个函数   arm_cfft_radix4_f32(const arm_cfft_radix4_instance_f32 * S, float32_t * pSrc);   
+				就是执行基 4 浮点 FFT 运算的，
+				pSrc 传入采集到的输入信号数据（实部+虚部形式），同时 FFT 变换后的数据，也按顺序存放在 pSrc 里面，
+				pSrc 必须大于等于 2 倍 fftLen 长度。
+				另外，S 结构体指针参数是先由 arm_cfft_radix4_init_f32 函数设置好， 然后传入该函数的。
+		第三个函数 arm_cmplx_mag_f32(float32_t * pSrc, float32_t * pDst, uint32_t numSamples); 
+				用于计算复数模值，可以对 FFT 变换后的结果数据，执行取模操作。
+				pSrc 为复数输入数组（大小为 2*numSamples）指针，指向 FFT(第二个函数) 变换后的结果；
+				pDst 为输出数组（大小为 numSamples）指针，存储取模后的值；
+				numSamples 就是总共有多少个数据需要取模。
+	
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
