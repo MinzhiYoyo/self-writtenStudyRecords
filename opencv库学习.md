@@ -2,7 +2,7 @@
 
 ## 1、方便开发的函数
 
-	### 1）设置滑动条
+### 1）设置滑动条
 
 ```c++
 namedWindow("二值化图像", 1);
@@ -93,7 +93,7 @@ ret2,thresholdFrame = cv2.threshold(grayFrame,127,255,cv2.THRESH_BINARY) # 二�
 
 # 4) 图像进行透视
 
-![image-20210125190528312](C:\Users\86186\AppData\Roaming\Typora\typora-user-images\image-20210125190528312.png)
+![image-20210125190528312](https://gitee.com/lmz2498369702/image-repository/raw/master/202112010848161.png)
 
 ```c++
 /*
