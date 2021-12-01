@@ -7,7 +7,7 @@
 ```mysql
 # 打开数据库
 mysql -u root -p  # 回车
-mufeng # 密码
+***** # 密码
 
 # 查询有哪些数据库
 show databases; 
